@@ -8,12 +8,6 @@ using Windows.Devices.Gpio;
 
 namespace LCDTest
 {
-    //LCD_CHR = True
-    //LCD_CMD = False
-    //# Timing constants
-    //E_PULSE = 0.0005
-    //E_DELAY = 0.0005
-
     class LCD
     {
         // LCD Wiring
@@ -35,10 +29,27 @@ namespace LCDTest
         private const int DB6 = 16;
         private const int DB7 = 18;
 
-        private const int LINE1 = 0x80;
-        private const int LINE2 = 0xC0;
+        public enum DisplayLine
+        {
+            LineOne = 0x80,
+            LineTwo = 0xC0,
+            LineThree = 0x94,
+            LineFour = 0xD4
+        }
 
-        private const int WIDTH = 16;
+        public enum LineJustification
+        {
+            Left = 0,
+            Center, 
+            Right
+        }
+
+        public const int LINE1 = 0x80;
+        public const int LINE2 = 0xC0;
+        public const int LINE3 = 0x94;
+        public const int LINE4 = 0xD4;
+
+        private const int WIDTH = 20;
 
         // GPIO Pins
         private GpioPin RegisterSelectPin;
@@ -53,6 +64,42 @@ namespace LCDTest
             Command = 0,
             Data = 1
         }
+
+        private byte ClearDisplayCommand = 0x01;
+        private byte ReturnHomeCommand = 0x02;
+        private byte EntrySetModeCommand = 0x04;
+        private byte DisplayControlCommand = 008;
+        private byte CursorShiftCommand = 0x10;
+        private byte FunctionSetCommand = 0x20;
+        private byte SetCGRAMAddressCommand = 0x40;
+        private byte SetDDRAMAddressCommand = 0x80;
+
+        private byte DisplayEntryRight = 0x00;
+        private byte DisplayEntryLeft = 0x02;
+
+        private byte ShiftStyleDecrement = 0x00;
+        private byte ShiftStyleIncrement = 0x01;
+
+        private byte DisplayOff = 0x00;
+        private byte DisplayOn = 0x04;
+
+        private byte CursorOff = 0x00;
+        private byte CursorOn = 0x02;
+
+        private byte BlinkOff = 0x00;
+        private byte BlinkOn = 0x01;
+
+        private byte DisplayMove = 0x08;
+        private byte CursorMove = 0x00;
+        private byte MoveLeft = 0x00;
+        private byte MoveRight = 0x04;
+
+        private byte Mode8Bit = 0x10;
+        private byte Mode4Bit = 0x00;
+        private byte Mode2Line = 0x08;
+        private byte Mode1Line = 0x00;
+        private byte Mode5x10 = 0x04;
+        private byte Mode5x8 = 0x00;
 
         public LCD()
         {
@@ -83,31 +130,41 @@ namespace LCDTest
 
         private void Initialize()
         {
-            SendBytes(0x30, RegisterMode.Command); // Initialize part 1
-            Sleep(5);
-            SendBytes(0x30, RegisterMode.Command); // Initialize part 2
-            Sleep(1);
-            SendBytes(0x30, RegisterMode.Command); // Initialize part 3
-            SendBytes(0x3F, RegisterMode.Command); // Set number of display lines and font
-            SendBytes(0x07, RegisterMode.Command); // Set 
-            //SendBytes(0x06, RegisterMode.Command); // Cursor move direction
-            SendBytes(0x0C, RegisterMode.Command); // Display On, Cursor Off, Blink Off
-            //SendBytes(0x28, RegisterMode.Command); // Data length, Number of lines, Font size
-            //SendBytes(0x01, RegisterMode.Command); // Clear Display
+            SendBytes(0x33, RegisterMode.Command); // 
+
+            SendBytes(0x32, RegisterMode.Command); // 
+
+            SendBytes(0x06, RegisterMode.Command); // 
+
+            SendBytes(0x0C, RegisterMode.Command); // 
+
+            SendBytes(0x28, RegisterMode.Command); // Data length, Number of lines, Font size
+
+            SendBytes(0x01, RegisterMode.Command); // Clear Display
             Sleep(5);
         }
 
         public void ClearDisplay()
         {
-            SendBytes(0x01, RegisterMode.Command);
+            SendCommand(ClearDisplayCommand);
         }
 
-        public void DisplayOff()
+        public void ReturnHome()
         {
-            SendBytes(0x08, RegisterMode.Command);
+            SendCommand(ReturnHomeCommand);
         }
 
-        private void SendBytes(byte data, RegisterMode mode)
+        private void SendCommand(int data)
+        {
+            SendBytes(data, RegisterMode.Command);
+        }
+
+        private void SendData(int data)
+        {
+            SendBytes(data, RegisterMode.Data);
+        }
+
+        private void SendBytes(int data, RegisterMode mode)
         {
             RegisterSelectPin.Write((GpioPinValue)mode);
 
@@ -117,8 +174,8 @@ namespace LCDTest
 
             WriteHighIfData(data, 0x10, DataBusPin4);
             WriteHighIfData(data, 0x20, DataBusPin5);
-            WriteHighIfData(data, 0x30, DataBusPin6);
-            WriteHighIfData(data, 0x40, DataBusPin7);
+            WriteHighIfData(data, 0x40, DataBusPin6);
+            WriteHighIfData(data, 0x80, DataBusPin7);
 
             ToggleEnablePin();
 
@@ -126,8 +183,10 @@ namespace LCDTest
 
             WriteHighIfData(data, 0x01, DataBusPin4);
             WriteHighIfData(data, 0x02, DataBusPin5);
-            WriteHighIfData(data, 0x03, DataBusPin6);
-            WriteHighIfData(data, 0x04, DataBusPin7);
+            WriteHighIfData(data, 0x04, DataBusPin6);
+            WriteHighIfData(data, 0x08, DataBusPin7);
+
+            ToggleEnablePin();
         }
 
         private void ClearDataPins()
@@ -138,9 +197,9 @@ namespace LCDTest
             DataBusPin7.Write(GpioPinValue.Low);
         }
 
-        private void WriteHighIfData(byte data, byte mask, GpioPin pin)
+        private void WriteHighIfData(int data, byte mask, GpioPin pin)
         {
-            if ((data & mask) == 1)
+            if ((data & mask) != 0)
             {
                 pin.Write(GpioPinValue.High);
             }
@@ -155,16 +214,179 @@ namespace LCDTest
             Sleep(5);
         }
 
-        static void Sleep(int ms)
+        private DisplayLine AdvanceLine(DisplayLine currentLine, DisplayLine lineToResetTo = DisplayLine.LineOne)
+        {
+            DisplayLine newLine = DisplayLine.LineOne;
+
+            switch (currentLine)
+            {
+                case DisplayLine.LineOne:
+                    newLine = DisplayLine.LineTwo;
+                    break;
+                case DisplayLine.LineTwo:
+                    newLine = DisplayLine.LineThree;
+                    break;
+                case DisplayLine.LineThree:
+                    newLine = DisplayLine.LineFour;
+                    break;
+                case DisplayLine.LineFour:
+                    newLine = lineToResetTo;
+
+                    Sleep(500);
+
+                    if (lineToResetTo == DisplayLine.LineOne)
+                    {
+                        ClearDisplay();
+                    } else
+                    {
+                        switch (lineToResetTo)
+                        {
+                            case DisplayLine.LineTwo:
+                                ClearLine(DisplayLine.LineTwo);
+                                ClearLine(DisplayLine.LineThree);
+                                ClearLine(DisplayLine.LineFour);
+                                break;
+                            case DisplayLine.LineThree:
+                                ClearLine(DisplayLine.LineThree);
+                                ClearLine(DisplayLine.LineFour);
+                                break;
+                            case DisplayLine.LineFour:
+                                ClearLine(DisplayLine.LineFour);
+                                break;
+                        }
+                    }
+                    break;
+            }
+
+            SendCommand((int)newLine);
+
+            return newLine;
+        }
+
+        private string JustifyString(string str, LineJustification justification)
+        {
+            string justified = str;
+            int whitespace = WIDTH - str.Length;
+
+            if (whitespace > 0)
+            {
+                switch (justification)
+                {
+                    case LineJustification.Left:
+                        // do nothing, already left justified
+                        break;
+                    case LineJustification.Center:
+                        if (whitespace %2 == 0)
+                        {
+                            justified = WhiteSpace(whitespace / 2) + str + WhiteSpace(whitespace / 2);
+                        } else
+                        {
+                            justified = WhiteSpace(whitespace / 2) + str + WhiteSpace((whitespace - 1) / 2);
+                        }
+
+                        break;
+                    case LineJustification.Right:
+                        justified = WhiteSpace(whitespace) + str;
+                        break;
+                }
+            }
+
+            return justified;
+        }
+
+        private string WhiteSpace(int number)
+        {
+            string ws = "";
+
+            for (int i=0; i<number; i++)
+            {
+                ws += " ";
+            }
+
+            return ws;
+        }
+
+        public static void Sleep(int ms)
         {
             new System.Threading.ManualResetEvent(false).WaitOne(ms);
         }
 
-        public void WriteString(string str)
+        public void WriteStringOnLine(string str, DisplayLine line = DisplayLine.LineOne, LineJustification justification = LineJustification.Left)
         {
-            foreach (char c in str)
+            SendCommand((int)line);
+
+            if (justification != LineJustification.Left)
             {
-                SendBytes((byte)c, RegisterMode.Data);
+                str = JustifyString(str, justification);
+            }
+
+            byte[] asciiValues = Encoding.ASCII.GetBytes(str);
+
+            for (int i = 0; i < str.Length && i < WIDTH; i++)
+            {
+                SendData(asciiValues[i]);
+            }
+        }
+
+        public void ClearLine(DisplayLine line)
+        {
+            SendCommand((int)line);
+
+            for (int i=0; i< WIDTH; i++)
+            {
+                SendData(0x20);
+            }
+        }
+        
+        public void WriteString(string str, DisplayLine startLine = DisplayLine.LineOne)
+        {
+            int currentCharInLine = 1;
+            int remainingCharsInLine = WIDTH;
+
+            DisplayLine currentLine = startLine;
+            SendCommand((int)currentLine);
+
+            string[] words = str.Split(' ');
+
+            foreach (string word in words)
+            {
+                bool breakWord = false;
+                byte[] asciiValues = Encoding.ASCII.GetBytes(word);
+
+                remainingCharsInLine = WIDTH - currentCharInLine;
+
+                if ((remainingCharsInLine == 0 && word.Length <= WIDTH) || (word.Length > remainingCharsInLine && word.Length <= WIDTH))
+                {
+                    currentLine = AdvanceLine(currentLine, startLine);
+                    currentCharInLine = 1;
+                }
+                else if (word.Length > WIDTH)
+                {
+                    breakWord = true;
+                }
+
+                for (int i = 0; i < word.Length; i++)
+                {
+                    remainingCharsInLine = WIDTH - currentCharInLine;
+                    if (remainingCharsInLine == 0 && breakWord)
+                    {
+
+                        if (i != 0)
+                        {
+                            // only write the - if we have actually started writing the word
+                            SendData(0x2D);
+                        }
+
+                        currentLine = AdvanceLine(currentLine, startLine);
+                        currentCharInLine = 1;
+                    }
+
+                    SendData(asciiValues[i]);
+                    currentCharInLine++;
+                }
+
+                SendData(0x20);
+                currentCharInLine++;
             }
         }
     }
