@@ -40,7 +40,7 @@ namespace LCDTest
         public enum LineJustification
         {
             Left = 0,
-            Center, 
+            Center,
             Right
         }
 
@@ -130,17 +130,12 @@ namespace LCDTest
 
         private void Initialize()
         {
-            SendBytes(0x33, RegisterMode.Command); // 
-
-            SendBytes(0x32, RegisterMode.Command); // 
-
-            SendBytes(0x06, RegisterMode.Command); // 
-
-            SendBytes(0x0C, RegisterMode.Command); // 
-
-            SendBytes(0x28, RegisterMode.Command); // Data length, Number of lines, Font size
-
-            SendBytes(0x01, RegisterMode.Command); // Clear Display
+            SendBytes(0x33, RegisterMode.Command);
+            SendBytes(0x32, RegisterMode.Command);
+            SendBytes(0x06, RegisterMode.Command);
+            SendBytes(0x0C, RegisterMode.Command);
+            SendBytes(0x28, RegisterMode.Command);
+            ClearDisplay();
             Sleep(5);
         }
 
@@ -237,7 +232,8 @@ namespace LCDTest
                     if (lineToResetTo == DisplayLine.LineOne)
                     {
                         ClearDisplay();
-                    } else
+                    }
+                    else
                     {
                         switch (lineToResetTo)
                         {
@@ -276,10 +272,11 @@ namespace LCDTest
                         // do nothing, already left justified
                         break;
                     case LineJustification.Center:
-                        if (whitespace %2 == 0)
+                        if (whitespace % 2 == 0)
                         {
                             justified = WhiteSpace(whitespace / 2) + str + WhiteSpace(whitespace / 2);
-                        } else
+                        }
+                        else
                         {
                             justified = WhiteSpace(whitespace / 2) + str + WhiteSpace((whitespace - 1) / 2);
                         }
@@ -298,7 +295,7 @@ namespace LCDTest
         {
             string ws = "";
 
-            for (int i=0; i<number; i++)
+            for (int i = 0; i < number; i++)
             {
                 ws += " ";
             }
@@ -332,12 +329,12 @@ namespace LCDTest
         {
             SendCommand((int)line);
 
-            for (int i=0; i< WIDTH; i++)
+            for (int i = 0; i < WIDTH; i++)
             {
                 SendData(0x20);
             }
         }
-        
+
         public void WriteString(string str, DisplayLine startLine = DisplayLine.LineOne)
         {
             int currentCharInLine = 1;
